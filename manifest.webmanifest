@@ -1,0 +1,18 @@
+{
+  "name": "Looper — Beat Looper",
+  "short_name": "Looper",
+  "description": "A mobile-first beat looper. Stack drums, piano, bass and synth loops and overdub live.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0e0e16",
+  "theme_color": "#0e0e16",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
