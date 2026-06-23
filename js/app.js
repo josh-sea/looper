@@ -8,7 +8,7 @@
   /* ---------------- Instrument definitions ---------------- */
   var INSTRUMENTS = {
     drums: {
-      name: "Drums", kind: "pads", color: "#ff5470",
+      name: "Drums", kind: "pads", color: "#ff5470", category: "Drums & FX",
       desc: "Kick, snare, hats & more",
       pads: [
         { id: "kick", label: "Kick" },
@@ -19,37 +19,67 @@
         { id: "tom", label: "Tom" }
       ]
     },
+    foley: {
+      name: "Foley FX", kind: "pads", color: "#7ad7a0", category: "Drums & FX",
+      desc: "Brooms, drops, snaps & barks",
+      pads: [
+        { id: "broom", label: "Broom" },
+        { id: "drop", label: "Water Drop" },
+        { id: "pop", label: "Pop" },
+        { id: "click", label: "Click" },
+        { id: "snap", label: "Snap" },
+        { id: "bark", label: "Dog Bark" }
+      ]
+    },
     piano: {
-      name: "Piano", kind: "keys", color: "#4cc9f0",
+      name: "Piano", kind: "keys", color: "#4cc9f0", category: "Keys & strings",
       desc: "Mellow keys", baseMidi: 48, octaves: 2,
       voice: { wave: "triangle", fat: false, cutoff: 3500, q: 0.6, attack: 0.005, decay: 0.25, sustain: 0.35, release: 0.4, gain: 0.6 }
     },
-    synth: {
-      name: "Synth", kind: "keys", color: "#b388ff",
-      desc: "Fat saw lead", baseMidi: 48, octaves: 2,
-      voice: { wave: "sawtooth", fat: true, cutoff: 5000, cutoffEnd: 1200, q: 4, attack: 0.01, decay: 0.2, sustain: 0.7, release: 0.35, gain: 0.4 }
+    guitar: {
+      name: "Acoustic Guitar", kind: "keys", color: "#c98a3a", category: "Keys & strings",
+      desc: "Plucked steel string", baseMidi: 40, octaves: 2,
+      voice: { wave: "triangle", fat: true, cutoff: 3000, cutoffEnd: 700, q: 1, attack: 0.004, decay: 0.5, sustain: 0.06, release: 0.35, gain: 0.6 }
+    },
+    eguitar: {
+      name: "Electric Guitar", kind: "keys", color: "#d65a3a", category: "Keys & strings",
+      desc: "Overdriven lead", baseMidi: 40, octaves: 2,
+      voice: { wave: "sawtooth", fat: true, cutoff: 2200, cutoffEnd: 1400, q: 5, attack: 0.005, decay: 0.3, sustain: 0.35, release: 0.3, gain: 0.34 }
     },
     bass: {
-      name: "Bass", kind: "keys", color: "#80ffea",
+      name: "Bass", kind: "keys", color: "#80ffea", category: "Keys & strings",
       desc: "Deep & round", baseMidi: 28, octaves: 2,
       voice: { wave: "square", fat: false, cutoff: 700, q: 2, attack: 0.005, decay: 0.2, sustain: 0.8, release: 0.2, gain: 0.5 }
     },
+    synth: {
+      name: "Synth", kind: "keys", color: "#b388ff", category: "Synth & lead",
+      desc: "Fat saw lead", baseMidi: 48, octaves: 2,
+      voice: { wave: "sawtooth", fat: true, cutoff: 5000, cutoffEnd: 1200, q: 4, attack: 0.01, decay: 0.2, sustain: 0.7, release: 0.35, gain: 0.4 }
+    },
+    whistle: {
+      name: "Whistle", kind: "keys", color: "#a0e7e5", category: "Synth & lead",
+      desc: "Pure breathy tone", baseMidi: 72, octaves: 2,
+      voice: { wave: "sine", fat: false, cutoff: 6000, q: 0.5, attack: 0.06, decay: 0.1, sustain: 0.9, release: 0.18, gain: 0.5, vibrato: 18, vibratoRate: 5.5 }
+    },
     trumpet: {
-      name: "Trumpet", kind: "keys", color: "#ffd166",
+      name: "Trumpet", kind: "keys", color: "#ffd166", category: "Brass",
       desc: "Bright brass lead", baseMidi: 52, octaves: 2,
       voice: { wave: "sawtooth", fat: false, cutoff: 1200, cutoffEnd: 4200, q: 3, attack: 0.04, decay: 0.1, sustain: 0.85, release: 0.18, gain: 0.34 }
     },
     trombone: {
-      name: "Trombone", kind: "keys", color: "#f4a259",
+      name: "Trombone", kind: "keys", color: "#f4a259", category: "Brass",
       desc: "Low, bold brass", baseMidi: 40, octaves: 2,
       voice: { wave: "sawtooth", fat: false, cutoff: 700, cutoffEnd: 2400, q: 3, attack: 0.05, decay: 0.1, sustain: 0.85, release: 0.2, gain: 0.36 }
     },
     horn: {
-      name: "French Horn", kind: "keys", color: "#e09f3e",
+      name: "French Horn", kind: "keys", color: "#e09f3e", category: "Brass",
       desc: "Warm brass section", baseMidi: 45, octaves: 2,
       voice: { wave: "sawtooth", fat: true, cutoff: 900, cutoffEnd: 2000, q: 2, attack: 0.07, decay: 0.12, sustain: 0.8, release: 0.3, gain: 0.3 }
     }
   };
+
+  // Display order for the instrument picker's category groups.
+  var CATEGORY_ORDER = ["Drums & FX", "Keys & strings", "Synth & lead", "Brass"];
 
   var NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
   var BLACK = { 1: true, 3: true, 6: true, 8: true, 10: true };
@@ -62,6 +92,7 @@
     quantize: 0.25, // grid in beats; 0 = off
     metronome: false,
     masterVol: 0.9,
+    fx: { reverb: 0, delay: 0 }, // master effect amounts, 0 = off
     tracks: [],
     selectedId: null,
     seq: 1
@@ -72,7 +103,8 @@
 
   /* ---------------- Audio ---------------- */
   var ctx = null;
-  var master = null;
+  var master = null;   // node synths connect to (the FX-chain input / master gain)
+  var fxChain = null;  // { input, revSend, delSend, delay }
   var schedulerId = null;
   var lookahead = 0.1; // seconds scheduled ahead
   var tickMs = 25;
@@ -85,9 +117,10 @@
     if (ctx) return;
     var AC = window.AudioContext || window.webkitAudioContext;
     ctx = new AC();
-    master = ctx.createGain();
-    master.gain.value = state.masterVol;
-    master.connect(ctx.destination);
+    fxChain = Synth.createFxChain(ctx, ctx.destination, {
+      masterVol: state.masterVol, reverb: state.fx.reverb, delay: state.fx.delay, bpm: state.bpm
+    });
+    master = fxChain.input;
   }
   function resumeAudio() {
     ensureAudio();
@@ -104,7 +137,7 @@
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         bpm: state.bpm, bars: state.bars, quantize: state.quantize,
-        metronome: state.metronome, masterVol: state.masterVol,
+        metronome: state.metronome, masterVol: state.masterVol, fx: state.fx,
         tracks: state.tracks, selectedId: state.selectedId, seq: state.seq
       }));
     } catch (e) { /* ignore quota / private mode */ }
@@ -119,6 +152,10 @@
       state.quantize = d.quantize != null ? d.quantize : state.quantize;
       state.metronome = !!d.metronome;
       state.masterVol = d.masterVol != null ? d.masterVol : state.masterVol;
+      if (d.fx) {
+        state.fx.reverb = d.fx.reverb || 0;
+        state.fx.delay = d.fx.delay || 0;
+      }
       state.tracks = Array.isArray(d.tracks) ? d.tracks : [];
       state.selectedId = d.selectedId || (state.tracks[0] && state.tracks[0].id) || null;
       state.seq = d.seq || (state.tracks.length + 1);
@@ -532,19 +569,36 @@
   function openInstrumentPicker() {
     var grid = document.getElementById("instrumentGrid");
     grid.innerHTML = "";
+
+    // Bucket instruments by category, preserving definition order within each.
+    var byCat = {};
     Object.keys(INSTRUMENTS).forEach(function (key) {
-      var inst = INSTRUMENTS[key];
-      var btn = document.createElement("button");
-      btn.className = "inst-choice";
-      btn.innerHTML =
-        '<span class="ic-swatch" style="background:' + inst.color + '"></span>' +
-        '<span class="ic-name">' + inst.name + "</span>" +
-        '<span class="ic-desc">' + inst.desc + "</span>";
-      btn.addEventListener("click", function () {
-        addTrack(key);
-        closeModal();
+      var cat = INSTRUMENTS[key].category || "Other";
+      (byCat[cat] = byCat[cat] || []).push(key);
+    });
+    // Known categories first (in CATEGORY_ORDER), then any stragglers.
+    var cats = CATEGORY_ORDER.filter(function (c) { return byCat[c]; });
+    Object.keys(byCat).forEach(function (c) { if (cats.indexOf(c) === -1) cats.push(c); });
+
+    cats.forEach(function (cat) {
+      var title = document.createElement("div");
+      title.className = "inst-group-title";
+      title.textContent = cat;
+      grid.appendChild(title);
+      byCat[cat].forEach(function (key) {
+        var inst = INSTRUMENTS[key];
+        var btn = document.createElement("button");
+        btn.className = "inst-choice";
+        btn.innerHTML =
+          '<span class="ic-swatch" style="background:' + inst.color + '"></span>' +
+          '<span class="ic-name">' + inst.name + "</span>" +
+          '<span class="ic-desc">' + inst.desc + "</span>";
+        btn.addEventListener("click", function () {
+          addTrack(key);
+          closeModal();
+        });
+        grid.appendChild(btn);
       });
-      grid.appendChild(btn);
     });
     document.getElementById("modal").hidden = false;
   }
@@ -575,6 +629,8 @@
     document.getElementById("barsSelect").value = String(state.bars);
     document.getElementById("quantizeSelect").value = String(state.quantize);
     document.getElementById("masterVol").value = String(state.masterVol);
+    document.getElementById("reverbAmt").value = String(state.fx.reverb);
+    document.getElementById("delayAmt").value = String(state.fx.delay);
     document.getElementById("metroBtn").setAttribute("aria-pressed", state.metronome ? "true" : "false");
     renderTracks();
     renderStage();
@@ -591,14 +647,16 @@
     var spb = secPerBeat();
     var loopSec = loopSeconds();
     var tb = totalBeats();
-    var tail = 1.5; // let note/drum release tails ring out
+    var anyFx = state.fx.reverb > 0 || state.fx.delay > 0;
+    var tail = anyFx ? 3.5 : 1.5; // let note/drum + reverb/delay tails ring out
     var sr = 44100;
     var frames = Math.ceil((loopSec * repeats + tail) * sr);
     var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
     var off = new OAC(2, frames, sr);
-    var m = off.createGain();
-    m.gain.value = state.masterVol;
-    m.connect(off.destination);
+    // Same FX chain as live playback so the export matches what you hear.
+    var m = Synth.createFxChain(off, off.destination, {
+      masterVol: state.masterVol, reverb: state.fx.reverb, delay: state.fx.delay, bpm: state.bpm
+    }).input;
 
     for (var r = 0; r < repeats; r++) {
       var rOff = r * loopSec;
@@ -713,7 +771,7 @@
 
   /* ---- Beat link (share the editable loop) ---- */
   function encodeBeatUrl() {
-    var data = { v: 1, bpm: state.bpm, bars: state.bars, quantize: state.quantize, tracks: state.tracks };
+    var data = { v: 1, bpm: state.bpm, bars: state.bars, quantize: state.quantize, fx: state.fx, tracks: state.tracks };
     var json = JSON.stringify(data);
     var b64 = btoa(unescape(encodeURIComponent(json)))
       .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -770,6 +828,10 @@
       state.bpm = data.bpm || state.bpm;
       state.bars = data.bars || state.bars;
       state.quantize = data.quantize != null ? data.quantize : state.quantize;
+      if (data.fx) {
+        state.fx.reverb = data.fx.reverb || 0;
+        state.fx.delay = data.fx.delay || 0;
+      }
       state.tracks = data.tracks;
       state.tracks.forEach(function (t, i) { t.id = "t" + (i + 1); t.events = t.events || []; });
       state.seq = state.tracks.length + 1;
@@ -817,6 +879,7 @@
         var d = parseInt(b.dataset.bpm, 10) * (b.dataset.held ? 5 : 1);
         state.bpm = Math.min(240, Math.max(40, state.bpm + d));
         document.getElementById("bpmValue").textContent = state.bpm;
+        if (fxChain) fxChain.delay.delayTime.value = Math.min(1.9, secPerBeat() * 0.75);
         restartIfPlaying(); save();
       });
     });
@@ -838,6 +901,16 @@
     document.getElementById("masterVol").addEventListener("input", function (e) {
       state.masterVol = parseFloat(e.target.value);
       if (master) master.gain.value = state.masterVol;
+      save();
+    });
+    document.getElementById("reverbAmt").addEventListener("input", function (e) {
+      state.fx.reverb = parseFloat(e.target.value);
+      if (fxChain) fxChain.revSend.gain.value = state.fx.reverb;
+      save();
+    });
+    document.getElementById("delayAmt").addEventListener("input", function (e) {
+      state.fx.delay = parseFloat(e.target.value);
+      if (fxChain) fxChain.delSend.gain.value = state.fx.delay;
       save();
     });
 
