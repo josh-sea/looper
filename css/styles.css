@@ -44,9 +44,15 @@ button, select, input { font-family: inherit; }
   border-bottom: 1px solid var(--line);
   padding: calc(env(safe-area-inset-top) + 10px) 12px 10px;
 }
-.brand { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.brand { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.brand-left { display: flex; align-items: center; gap: 8px; }
 .logo { color: var(--accent); font-size: 20px; }
 .brand-name { font-weight: 700; letter-spacing: 0.5px; }
+.share-btn {
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--line);
+  border-radius: 999px; padding: 7px 14px; font-weight: 700; font-size: 13px; cursor: pointer;
+}
+.share-btn:active { transform: scale(0.96); background: var(--accent-2); color: #06131a; }
 
 .top-controls {
   display: flex;
@@ -248,6 +254,28 @@ button, select, input { font-family: inherit; }
   border: 1px solid var(--line); background: transparent; color: var(--muted);
   font-weight: 600; cursor: pointer;
 }
+
+/* share sheet */
+.share-section {
+  border: 1px solid var(--line); background: var(--panel-2);
+  border-radius: 14px; padding: 14px; margin-bottom: 12px;
+}
+.share-section-title { font-weight: 700; font-size: 14px; margin-bottom: 10px; }
+.share-note { color: var(--muted); font-size: 13px; margin: 0 0 10px; line-height: 1.4; }
+.ctrl.inline { display: inline-flex; margin-bottom: 12px; }
+.share-actions { display: flex; flex-direction: column; gap: 8px; }
+.share-action {
+  width: 100%; padding: 14px; border-radius: 12px; font-weight: 700; font-size: 15px;
+  border: 1px solid var(--line); background: var(--panel); color: var(--text); cursor: pointer;
+}
+.share-action.primary { background: var(--accent); color: #2a0411; border-color: var(--accent); }
+.share-action:active { transform: scale(0.98); }
+.share-action[disabled] { opacity: 0.6; cursor: default; }
+.share-status {
+  min-height: 20px; text-align: center; font-size: 13px; color: var(--ok);
+  margin-bottom: 6px; font-weight: 600;
+}
+.share-status.error { color: var(--accent); }
 
 @media (min-width: 600px) {
   .pad-grid { grid-template-columns: repeat(6, 1fr); }

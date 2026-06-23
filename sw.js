@@ -1,5 +1,5 @@
 /* Minimal offline cache so the app works once loaded (great for phones). */
-var CACHE = "looper-v1";
+var CACHE = "looper-v2";
 var ASSETS = [
   "./",
   "./index.html",
