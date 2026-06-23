@@ -37,8 +37,11 @@ Tap **⤴ Share** (top right) to:
 - **Share audio** – renders your loop to a `.wav` and opens your phone's native
   share sheet (Messages, AirDrop, etc.). On desktop it downloads instead.
 - **Download .wav** – save the rendered loop. Pick how many times it repeats.
-- **Copy beat link** – copies a link that encodes the whole loop. When a friend
-  opens it they get your exact beat to play and remix.
+- **Share arrangement** – hands off an editable copy of your whole arrangement
+  (every track, note and setting) through your phone's share sheet, or **Copy
+  link** to grab the URL yourself. Whoever opens it picks up right where you left
+  off. Their edits stay on their copy, so your version is untouched — there's no
+  server, so a link is always a snapshot, not a shared live document.
 
 Audio is rendered entirely in the browser (offline, faster than real-time) using
 the same synths you hear live — no server, no uploads.

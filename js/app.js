@@ -738,13 +738,32 @@
     try { window.prompt("Copy this beat link:", url); shareStatus("Copy the link above."); }
     catch (e) { shareStatus("Couldn't copy link.", true); }
   }
+  // Hand off the editable arrangement via the native share sheet (Messages,
+  // WhatsApp, AirDrop…), falling back to copying the link on desktop.
+  function shareBeatLink() {
+    if (!state.tracks.length) { shareStatus("Add a track first.", true); return; }
+    var url = encodeBeatUrl();
+    if (navigator.share) {
+      navigator.share({
+        title: "My Looper beat",
+        text: "Pick up my Looper beat and keep editing:",
+        url: url
+      }).then(function () { shareStatus("Shared!"); })
+        .catch(function (e) {
+          if (e && e.name === "AbortError") { shareStatus(""); return; } // user cancelled
+          copyBeatLink(); // fall back to clipboard
+        });
+    } else {
+      copyBeatLink();
+    }
+  }
   function importFromUrl() {
     var m = (location.hash || "").match(/beat=([^&]+)/);
     if (!m) return;
     try {
       var data = decodeBeat(m[1]);
       if (!data || !Array.isArray(data.tracks)) return;
-      if (state.tracks.length && !window.confirm("Open shared beat? This replaces your current loop.")) {
+      if (state.tracks.length && !window.confirm("Open shared arrangement? This replaces your current loop.")) {
         history.replaceState(null, "", location.pathname);
         return;
       }
@@ -780,6 +799,7 @@
     });
     document.getElementById("downloadBtn").addEventListener("click", downloadAudio);
     document.getElementById("shareAudioBtn").addEventListener("click", shareAudio);
+    document.getElementById("shareLinkBtn").addEventListener("click", shareBeatLink);
     document.getElementById("copyLinkBtn").addEventListener("click", copyBeatLink);
 
     document.getElementById("playBtn").addEventListener("click", function () {
