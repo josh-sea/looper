@@ -11,7 +11,8 @@ the Web Audio API.
 
 1. **Open `index.html`** on your phone or computer (best on Chrome/Safari).
    - On a phone, serve it (see below) and "Add to Home Screen" to run it full-screen.
-2. **+ Add track** → pick an instrument (Drums, Piano, Synth, Bass).
+2. **+ Add track** → pick an instrument (Drums, Piano, Synth, Bass, Trumpet,
+   Trombone, French Horn).
 3. Tap **REC**, then play the pads/keys at the bottom. Whatever you tap gets
    recorded into the loop, snapped to the beat (set **Quantize** to *Off* for a
    looser, human feel).
@@ -29,6 +30,18 @@ the Web Audio API.
 - Desktop: **Spacebar** = play/stop.
 
 Your session auto-saves to the browser, so it's still there when you come back.
+
+### Sharing
+
+Tap **⤴ Share** (top right) to:
+- **Share audio** – renders your loop to a `.wav` and opens your phone's native
+  share sheet (Messages, AirDrop, etc.). On desktop it downloads instead.
+- **Download .wav** – save the rendered loop. Pick how many times it repeats.
+- **Copy beat link** – copies a link that encodes the whole loop. When a friend
+  opens it they get your exact beat to play and remix.
+
+Audio is rendered entirely in the browser (offline, faster than real-time) using
+the same synths you hear live — no server, no uploads.
 
 ## Running locally
 

@@ -15,8 +15,11 @@
     <!-- Header / controls -->
     <header class="topbar">
       <div class="brand">
-        <span class="logo">◉</span>
-        <span class="brand-name">Looper</span>
+        <div class="brand-left">
+          <span class="logo">◉</span>
+          <span class="brand-name">Looper</span>
+        </div>
+        <button id="shareBtn" class="share-btn">⤴ Share</button>
       </div>
       <div class="top-controls">
         <div class="ctrl bpm">
@@ -91,6 +94,39 @@
       <h3>Pick an instrument</h3>
       <div id="instrumentGrid" class="instrument-grid"></div>
       <button id="modalCancel" class="modal-cancel">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Share / export sheet -->
+  <div id="shareModal" class="modal" hidden>
+    <div class="modal-card">
+      <h3>Share your beat</h3>
+
+      <div class="share-section">
+        <div class="share-section-title">Download or send as audio</div>
+        <label class="ctrl select inline">
+          <small>Length</small>
+          <select id="exportRepeats">
+            <option value="1">1 loop</option>
+            <option value="2" selected>2 loops</option>
+            <option value="4">4 loops</option>
+            <option value="8">8 loops</option>
+          </select>
+        </label>
+        <div class="share-actions">
+          <button id="shareAudioBtn" class="share-action primary">↗ Share audio</button>
+          <button id="downloadBtn" class="share-action">⤓ Download .wav</button>
+        </div>
+      </div>
+
+      <div class="share-section">
+        <div class="share-section-title">Send the beat to remix</div>
+        <p class="share-note">Your friend opens the link and gets your exact loop to play with.</p>
+        <button id="copyLinkBtn" class="share-action">🔗 Copy beat link</button>
+      </div>
+
+      <div id="shareStatus" class="share-status" aria-live="polite"></div>
+      <button id="shareCancel" class="modal-cancel">Close</button>
     </div>
   </div>
 

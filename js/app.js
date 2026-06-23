@@ -33,6 +33,21 @@
       name: "Bass", kind: "keys", color: "#80ffea",
       desc: "Deep & round", baseMidi: 28, octaves: 2,
       voice: { wave: "square", fat: false, cutoff: 700, q: 2, attack: 0.005, decay: 0.2, sustain: 0.8, release: 0.2, gain: 0.5 }
+    },
+    trumpet: {
+      name: "Trumpet", kind: "keys", color: "#ffd166",
+      desc: "Bright brass lead", baseMidi: 52, octaves: 2,
+      voice: { wave: "sawtooth", fat: false, cutoff: 1200, cutoffEnd: 4200, q: 3, attack: 0.04, decay: 0.1, sustain: 0.85, release: 0.18, gain: 0.34 }
+    },
+    trombone: {
+      name: "Trombone", kind: "keys", color: "#f4a259",
+      desc: "Low, bold brass", baseMidi: 40, octaves: 2,
+      voice: { wave: "sawtooth", fat: false, cutoff: 700, cutoffEnd: 2400, q: 3, attack: 0.05, decay: 0.1, sustain: 0.85, release: 0.2, gain: 0.36 }
+    },
+    horn: {
+      name: "French Horn", kind: "keys", color: "#e09f3e",
+      desc: "Warm brass section", baseMidi: 45, octaves: 2,
+      voice: { wave: "sawtooth", fat: true, cutoff: 900, cutoffEnd: 2000, q: 2, attack: 0.07, decay: 0.12, sustain: 0.8, release: 0.3, gain: 0.3 }
     }
   };
 
@@ -565,6 +580,189 @@
     renderStage();
   }
 
+  /* ---------------- Export / share ---------------- */
+  function hasAudibleContent() {
+    return state.tracks.some(function (t) { return !t.muted && t.events.length > 0; });
+  }
+
+  // Render the (non-muted) loop to an AudioBuffer via OfflineAudioContext,
+  // repeated `repeats` times, reusing the same synth code as live playback.
+  function renderLoop(repeats) {
+    var spb = secPerBeat();
+    var loopSec = loopSeconds();
+    var tb = totalBeats();
+    var tail = 1.5; // let note/drum release tails ring out
+    var sr = 44100;
+    var frames = Math.ceil((loopSec * repeats + tail) * sr);
+    var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    var off = new OAC(2, frames, sr);
+    var m = off.createGain();
+    m.gain.value = state.masterVol;
+    m.connect(off.destination);
+
+    for (var r = 0; r < repeats; r++) {
+      var rOff = r * loopSec;
+      state.tracks.forEach(function (track) {
+        if (track.muted) return;
+        var inst = INSTRUMENTS[track.instrument];
+        track.events.forEach(function (ev) {
+          if (ev.pos >= tb) return;
+          var when = rOff + ev.pos * spb;
+          if (inst.kind === "pads") {
+            Synth.playDrum(off, m, ev.pad, when, 0.9);
+          } else {
+            var v = Synth.makeVoice(off, m, inst.voice, ev.midi, when, 0.85);
+            v.stop(when + (ev.dur || 0.25) * spb);
+          }
+        });
+      });
+    }
+    return off.startRendering();
+  }
+
+  function encodeWav(buffer) {
+    var numCh = buffer.numberOfChannels;
+    var sr = buffer.sampleRate;
+    var len = buffer.length;
+    var chans = [];
+    for (var c = 0; c < numCh; c++) chans.push(buffer.getChannelData(c));
+    var blockAlign = numCh * 2;
+    var dataSize = len * blockAlign;
+    var ab = new ArrayBuffer(44 + dataSize);
+    var view = new DataView(ab);
+    function str(off, s) { for (var i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); }
+    str(0, "RIFF");
+    view.setUint32(4, 36 + dataSize, true);
+    str(8, "WAVE");
+    str(12, "fmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);       // PCM
+    view.setUint16(22, numCh, true);
+    view.setUint32(24, sr, true);
+    view.setUint32(28, sr * blockAlign, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, 16, true);
+    str(36, "data");
+    view.setUint32(40, dataSize, true);
+    var offset = 44;
+    for (var i = 0; i < len; i++) {
+      for (var ch = 0; ch < numCh; ch++) {
+        var s = Math.max(-1, Math.min(1, chans[ch][i]));
+        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+        offset += 2;
+      }
+    }
+    return new Blob([view], { type: "audio/wav" });
+  }
+
+  function exportFilename() {
+    var d = new Date();
+    function p(n) { return String(n).padStart(2, "0"); }
+    var stamp = d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + "-" + p(d.getHours()) + p(d.getMinutes());
+    return "looper-" + state.bpm + "bpm-" + stamp + ".wav";
+  }
+
+  function shareStatus(msg, isError) {
+    var el = document.getElementById("shareStatus");
+    el.textContent = msg || "";
+    el.className = "share-status" + (isError ? " error" : "");
+  }
+
+  function getRepeats() {
+    return parseInt(document.getElementById("exportRepeats").value, 10) || 2;
+  }
+
+  function makeWavBlob() {
+    resumeAudio();
+    return renderLoop(getRepeats()).then(encodeWav);
+  }
+
+  function downloadAudio() {
+    if (!hasAudibleContent()) { shareStatus("Add or unmute a track with some notes first.", true); return; }
+    shareStatus("Rendering…");
+    makeWavBlob().then(function (blob) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = exportFilename();
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+      shareStatus("Saved to your downloads.");
+    }).catch(function (e) { shareStatus("Couldn't render audio.", true); });
+  }
+
+  function shareAudio() {
+    if (!hasAudibleContent()) { shareStatus("Add or unmute a track with some notes first.", true); return; }
+    shareStatus("Rendering…");
+    makeWavBlob().then(function (blob) {
+      var file = new File([blob], exportFilename(), { type: "audio/wav" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        return navigator.share({ files: [file], title: "My Looper beat" }).then(function () {
+          shareStatus("Shared!");
+        });
+      }
+      // No file-share support (e.g. desktop) — fall back to a download.
+      throw new Error("no-share");
+    }).catch(function (e) {
+      if (e && e.name === "AbortError") { shareStatus(""); return; } // user cancelled
+      downloadAudio(); // fallback
+    });
+  }
+
+  /* ---- Beat link (share the editable loop) ---- */
+  function encodeBeatUrl() {
+    var data = { v: 1, bpm: state.bpm, bars: state.bars, quantize: state.quantize, tracks: state.tracks };
+    var json = JSON.stringify(data);
+    var b64 = btoa(unescape(encodeURIComponent(json)))
+      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    return location.origin + location.pathname + "#beat=" + b64;
+  }
+  function decodeBeat(token) {
+    var b64 = token.replace(/-/g, "+").replace(/_/g, "/");
+    while (b64.length % 4) b64 += "=";
+    return JSON.parse(decodeURIComponent(escape(atob(b64))));
+  }
+  function copyBeatLink() {
+    if (!state.tracks.length) { shareStatus("Add a track first.", true); return; }
+    var url = encodeBeatUrl();
+    var done = function () { shareStatus("Link copied — paste it to a friend!"); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(done).catch(function () { promptCopy(url); });
+    } else {
+      promptCopy(url);
+    }
+  }
+  function promptCopy(url) {
+    try { window.prompt("Copy this beat link:", url); shareStatus("Copy the link above."); }
+    catch (e) { shareStatus("Couldn't copy link.", true); }
+  }
+  function importFromUrl() {
+    var m = (location.hash || "").match(/beat=([^&]+)/);
+    if (!m) return;
+    try {
+      var data = decodeBeat(m[1]);
+      if (!data || !Array.isArray(data.tracks)) return;
+      if (state.tracks.length && !window.confirm("Open shared beat? This replaces your current loop.")) {
+        history.replaceState(null, "", location.pathname);
+        return;
+      }
+      state.bpm = data.bpm || state.bpm;
+      state.bars = data.bars || state.bars;
+      state.quantize = data.quantize != null ? data.quantize : state.quantize;
+      state.tracks = data.tracks;
+      state.tracks.forEach(function (t, i) { t.id = "t" + (i + 1); t.events = t.events || []; });
+      state.seq = state.tracks.length + 1;
+      state.selectedId = state.tracks[0] ? state.tracks[0].id : null;
+      history.replaceState(null, "", location.pathname);
+      save();
+    } catch (e) { /* ignore malformed link */ }
+  }
+
+  function openShare() { shareStatus(""); document.getElementById("shareModal").hidden = false; }
+  function closeShare() { document.getElementById("shareModal").hidden = true; }
+
   /* ---------------- Wire up controls ---------------- */
   function restartIfPlaying() {
     if (playing) { stop(); play(); }
@@ -572,7 +770,17 @@
 
   function init() {
     load();
+    importFromUrl();
     renderAll();
+
+    document.getElementById("shareBtn").addEventListener("click", openShare);
+    document.getElementById("shareCancel").addEventListener("click", closeShare);
+    document.getElementById("shareModal").addEventListener("click", function (e) {
+      if (e.target.id === "shareModal") closeShare();
+    });
+    document.getElementById("downloadBtn").addEventListener("click", downloadAudio);
+    document.getElementById("shareAudioBtn").addEventListener("click", shareAudio);
+    document.getElementById("copyLinkBtn").addEventListener("click", copyBeatLink);
 
     document.getElementById("playBtn").addEventListener("click", function () {
       resumeAudio(); togglePlay();
