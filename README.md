@@ -11,8 +11,12 @@ the Web Audio API.
 
 1. **Open `index.html`** on your phone or computer (best on Chrome/Safari).
    - On a phone, serve it (see below) and "Add to Home Screen" to run it full-screen.
-2. **+ Add track** → pick an instrument (Drums, Piano, Synth, Bass, Trumpet,
-   Trombone, French Horn).
+2. **+ Add track** → pick an instrument from the grouped picker:
+   - **Drums & FX** – Drums (kick/snare/hats/clap/tom) and a **Foley FX** kit
+     (broom sweep, water drop, pop, click, snap, dog bark).
+   - **Keys & strings** – Piano, Acoustic Guitar, Electric Guitar, Bass.
+   - **Synth & lead** – Synth, Whistle.
+   - **Brass** – Trumpet, Trombone, French Horn.
 3. Tap **REC**, then play the pads/keys at the bottom. Whatever you tap gets
    recorded into the loop, snapped to the beat (set **Quantize** to *Off* for a
    looser, human feel).
@@ -27,6 +31,8 @@ the Web Audio API.
 - **Quantize** – snap recorded hits to a grid (1/4, 1/8, 1/16) or *Off*.
 - **🅼** – metronome click.
 - **Vol** – master volume.
+- **Reverb** / **Delay** – master effects (the delay is tempo-synced). They're
+  baked into rendered audio and travel with a shared arrangement link.
 - Desktop: **Spacebar** = play/stop.
 
 Your session auto-saves to the browser, so it's still there when you come back.
@@ -37,8 +43,11 @@ Tap **⤴ Share** (top right) to:
 - **Share audio** – renders your loop to a `.wav` and opens your phone's native
   share sheet (Messages, AirDrop, etc.). On desktop it downloads instead.
 - **Download .wav** – save the rendered loop. Pick how many times it repeats.
-- **Copy beat link** – copies a link that encodes the whole loop. When a friend
-  opens it they get your exact beat to play and remix.
+- **Share arrangement** – hands off an editable copy of your whole arrangement
+  (every track, note and setting) through your phone's share sheet, or **Copy
+  link** to grab the URL yourself. Whoever opens it picks up right where you left
+  off. Their edits stay on their copy, so your version is untouched — there's no
+  server, so a link is always a snapshot, not a shared live document.
 
 Audio is rendered entirely in the browser (offline, faster than real-time) using
 the same synths you hear live — no server, no uploads.
@@ -59,8 +68,10 @@ Opening `index.html` via `file://` mostly works too, but the service worker /
 
 ## How it works
 
-- `js/synth.js` – synthesizes drums (kick/snare/hats/clap/tom) and melodic voices
-  (piano/synth/bass) on the fly.
+- `js/synth.js` – synthesizes drums (kick/snare/hats/clap/tom), Foley FX
+  (broom/drop/pop/click/snap/bark) and melodic voices (piano/guitars/bass/
+  synth/whistle/brass) on the fly, plus the master reverb + delay FX chain
+  (shared by live playback and the offline render).
 - `js/app.js` – state, the look-ahead scheduler (notes are stored in **beats** so
   changing tempo keeps the groove), recording/overdub, and the UI.
 - `css/styles.css` – the dark, touch-friendly mobile layout.

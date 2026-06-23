@@ -240,6 +240,11 @@ button, select, input { font-family: inherit; }
 }
 .modal-card h3 { margin: 0 0 14px; }
 .instrument-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.inst-group-title {
+  grid-column: 1 / -1; font-size: 12px; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--muted); margin: 8px 2px 0;
+}
+.inst-group-title:first-child { margin-top: 0; }
 .inst-choice {
   border: 1px solid var(--line); border-radius: 14px; padding: 16px; cursor: pointer;
   background: var(--panel-2); color: var(--text); text-align: left;
