@@ -197,6 +197,27 @@ button, select, input { font-family: inherit; }
 .stage-placeholder { color: var(--muted); text-align: center; padding: 40px 0; }
 
 /* drum pads */
+/* pad kit: Pads / Notes mode toggle + sound picker (notes mode) */
+.pad-mode {
+  display: inline-flex; gap: 2px; padding: 2px; margin-bottom: 10px;
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px;
+}
+.pad-mode-btn {
+  border: 0; background: transparent; color: var(--muted); cursor: pointer;
+  font-weight: 700; font-size: 13px; padding: 6px 14px; border-radius: 8px;
+}
+.pad-mode-btn.on { background: var(--accent); color: #2a0411; }
+.pad-pick { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.pad-chip {
+  border: 1px solid var(--line); background: var(--panel); color: var(--text);
+  border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.pad-chip.on {
+  background: var(--lane-color); color: #0a0a12; border-color: var(--lane-color);
+  box-shadow: 0 0 12px var(--lane-color);
+}
+.pad-chip:active { transform: scale(0.96); }
+
 .pad-grid {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
 }
