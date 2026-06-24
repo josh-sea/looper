@@ -875,28 +875,126 @@
     });
   }
 
-  /* ---- Beat link (share the editable loop) ---- */
-  function encodeBeatUrl() {
-    var data = { v: 1, bpm: state.bpm, bars: state.bars, quantize: state.quantize, fx: state.fx, tracks: state.tracks };
-    var json = JSON.stringify(data);
-    var b64 = btoa(unescape(encodeURIComponent(json)))
-      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-    return location.origin + location.pathname + "#beat=" + b64;
+  /* ---- Beat link (share the editable loop) ----
+     Format lives in the URL hash (no backend), marked by a leading scheme char
+     on the token so old links keep working:
+       (none) → legacy v1: url-safe base64 of the full verbose JSON
+       "."    → v2 compact JSON, base64 (used when compression isn't available)
+       "~"    → v2 compact JSON, deflate-raw compressed, base64 (the default)
+     Compact + gzip typically shrinks links ~70-85%. */
+  function baseUrl() { return location.origin + location.pathname; }
+  function r4(n) { return Math.round(n * 10000) / 10000; } // trim float noise
+
+  // Compact, array-heavy representation (short keys; events as arrays).
+  function pack() {
+    return {
+      v: 2, b: state.bpm, r: state.bars, q: state.quantize,
+      f: [state.fx.reverb, state.fx.delay],
+      t: state.tracks.map(function (t) {
+        var inst = INSTRUMENTS[t.instrument];
+        var isPads = inst && inst.kind === "pads";
+        var evs = t.events.map(function (e) {
+          if (isPads) return e.midi != null ? [r4(e.pos), e.pad, e.midi] : [r4(e.pos), e.pad];
+          return [r4(e.pos), e.midi, r4(e.dur)];
+        });
+        return { i: t.instrument, m: t.muted ? 1 : 0, v: t.vol, p: t.pitched ? 1 : 0, a: t.activePad || "", e: evs };
+      })
+    };
   }
-  function decodeBeat(token) {
-    var b64 = token.replace(/-/g, "+").replace(/_/g, "/");
+  // Back to the shape importFromUrl expects (same as legacy v1 data).
+  function unpack(c) {
+    return {
+      v: 2, bpm: c.b, bars: c.r, quantize: c.q,
+      fx: { reverb: (c.f && c.f[0]) || 0, delay: (c.f && c.f[1]) || 0 },
+      tracks: (c.t || []).map(function (tc) {
+        var inst = INSTRUMENTS[tc.i];
+        var isPads = inst && inst.kind === "pads";
+        var events = (tc.e || []).map(function (a) {
+          if (isPads) { var ev = { pos: a[0], pad: a[1] }; if (a.length > 2) ev.midi = a[2]; return ev; }
+          return { pos: a[0], midi: a[1], dur: a[2] };
+        });
+        return {
+          instrument: tc.i, muted: !!tc.m, vol: tc.v != null ? tc.v : 1,
+          pitched: !!tc.p, activePad: tc.a || undefined, events: events
+        };
+      })
+    };
+  }
+
+  // base64url helpers (string and byte variants)
+  function strToB64url(str) {
+    return btoa(unescape(encodeURIComponent(str))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function b64urlToStr(s) {
+    var b64 = s.replace(/-/g, "+").replace(/_/g, "/");
     while (b64.length % 4) b64 += "=";
-    return JSON.parse(decodeURIComponent(escape(atob(b64))));
+    return decodeURIComponent(escape(atob(b64)));
   }
+  function bytesToB64url(bytes) {
+    var bin = "";
+    for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function b64urlToBytes(s) {
+    var b64 = s.replace(/-/g, "+").replace(/_/g, "/");
+    while (b64.length % 4) b64 += "=";
+    var bin = atob(b64), out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  function deflate(str) {
+    var cs = new CompressionStream("deflate-raw");
+    var w = cs.writable.getWriter();
+    w.write(new TextEncoder().encode(str)); w.close();
+    return new Response(cs.readable).arrayBuffer().then(function (b) { return new Uint8Array(b); });
+  }
+  function inflate(bytes) {
+    var ds = new DecompressionStream("deflate-raw");
+    var w = ds.writable.getWriter();
+    w.write(bytes); w.close();
+    return new Response(ds.readable).arrayBuffer().then(function (b) { return new TextDecoder().decode(b); });
+  }
+  var hasCompression = typeof CompressionStream !== "undefined" && typeof DecompressionStream !== "undefined";
+
+  // Build the shareable URL (async because compression streams are async).
+  function buildShareUrl() {
+    var json = JSON.stringify(pack());
+    if (hasCompression) {
+      return deflate(json).then(function (bytes) {
+        // If compression somehow loses (tiny payloads), fall back to plain compact.
+        var packed = baseUrl() + "#beat=~" + bytesToB64url(bytes);
+        var plain = baseUrl() + "#beat=." + strToB64url(json);
+        return packed.length <= plain.length ? packed : plain;
+      });
+    }
+    return Promise.resolve(baseUrl() + "#beat=." + strToB64url(json));
+  }
+  // Decode any of the three formats → data object importFromUrl understands.
+  function decodeBeat(token) {
+    var c0 = token.charAt(0);
+    if (c0 === "~") {
+      if (!hasCompression) return Promise.reject(new Error("no-decompress"));
+      return inflate(b64urlToBytes(token.slice(1))).then(function (json) { return unpack(JSON.parse(json)); });
+    }
+    if (c0 === ".") return Promise.resolve(unpack(JSON.parse(b64urlToStr(token.slice(1)))));
+    return Promise.resolve(JSON.parse(b64urlToStr(token))); // legacy v1
+  }
+
+  // Cache the (async-built) URL when the share sheet opens, so the Share/Copy
+  // taps can fire synchronously and keep their user-gesture (needed on iOS).
+  var shareUrlCache = null;
+
   function copyBeatLink() {
     if (!state.tracks.length) { shareStatus("Add a track first.", true); return; }
-    var url = encodeBeatUrl();
-    var done = function () { shareStatus("Link copied — paste it to a friend!"); };
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(url).then(done).catch(function () { promptCopy(url); });
-    } else {
-      promptCopy(url);
-    }
+    var go = function (url) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url)
+          .then(function () { shareStatus("Link copied — paste it to a friend!"); })
+          .catch(function () { promptCopy(url); });
+      } else { promptCopy(url); }
+    };
+    if (shareUrlCache) go(shareUrlCache);
+    else buildShareUrl().then(go).catch(function () { shareStatus("Couldn't build link.", true); });
   }
   function promptCopy(url) {
     try { window.prompt("Copy this beat link:", url); shareStatus("Copy the link above."); }
@@ -906,30 +1004,26 @@
   // WhatsApp, AirDrop…), falling back to copying the link on desktop.
   function shareBeatLink() {
     if (!state.tracks.length) { shareStatus("Add a track first.", true); return; }
-    var url = encodeBeatUrl();
-    if (navigator.share) {
-      navigator.share({
-        title: "My Looper beat",
-        text: "Pick up my Looper beat and keep editing:",
-        url: url
-      }).then(function () { shareStatus("Shared!"); })
+    if (!navigator.share) { copyBeatLink(); return; }
+    var doShare = function (url) {
+      navigator.share({ title: "My Looper beat", text: "Pick up my Looper beat and keep editing:", url: url })
+        .then(function () { shareStatus("Shared!"); })
         .catch(function (e) {
           if (e && e.name === "AbortError") { shareStatus(""); return; } // user cancelled
           copyBeatLink(); // fall back to clipboard
         });
-    } else {
-      copyBeatLink();
-    }
+    };
+    if (shareUrlCache) doShare(shareUrlCache);
+    else buildShareUrl().then(doShare).catch(function () { copyBeatLink(); });
   }
   function importFromUrl() {
     var m = (location.hash || "").match(/beat=([^&]+)/);
-    if (!m) return;
-    try {
-      var data = decodeBeat(m[1]);
-      if (!data || !Array.isArray(data.tracks)) return;
+    if (!m) return Promise.resolve(false);
+    return decodeBeat(m[1]).then(function (data) {
+      if (!data || !Array.isArray(data.tracks)) return false;
       if (state.tracks.length && !window.confirm("Open shared arrangement? This replaces your current loop.")) {
         history.replaceState(null, "", location.pathname);
-        return;
+        return false;
       }
       state.bpm = data.bpm || state.bpm;
       state.bars = data.bars || state.bars;
@@ -951,10 +1045,18 @@
       state.selectedId = state.tracks[0] ? state.tracks[0].id : null;
       history.replaceState(null, "", location.pathname);
       save();
-    } catch (e) { /* ignore malformed link */ }
+      return true;
+    }).catch(function () { return false; /* ignore malformed link */ });
   }
 
-  function openShare() { shareStatus(""); document.getElementById("shareModal").hidden = false; }
+  function openShare() {
+    shareStatus("");
+    shareUrlCache = null;
+    if (state.tracks.length) {
+      buildShareUrl().then(function (u) { shareUrlCache = u; }).catch(function () {});
+    }
+    document.getElementById("shareModal").hidden = false;
+  }
   function closeShare() { document.getElementById("shareModal").hidden = true; }
 
   /* ---------------- Wire up controls ---------------- */
@@ -964,8 +1066,10 @@
 
   function init() {
     load();
-    importFromUrl();
     renderAll();
+    // Importing a shared link is async (it may need to decompress); re-render
+    // once it resolves so the loaded arrangement shows.
+    importFromUrl().then(function (imported) { if (imported) renderAll(); });
 
     document.getElementById("shareBtn").addEventListener("click", openShare);
     document.getElementById("shareCancel").addEventListener("click", closeShare);

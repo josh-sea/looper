@@ -55,6 +55,12 @@ Tap **⤴ Share** (top right) to:
   off. Their edits stay on their copy, so your version is untouched — there's no
   server, so a link is always a snapshot, not a shared live document.
 
+  The arrangement is packed into the link itself (no backend): it's serialized to
+  a compact form and compressed with the browser's `CompressionStream` before
+  being base64-encoded into the URL hash — typically **~70–85% shorter** than the
+  raw encoding. Older links (and browsers without compression) still work via a
+  format tag on the token.
+
 Audio is rendered entirely in the browser (offline, faster than real-time) using
 the same synths you hear live — no server, no uploads.
 
