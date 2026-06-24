@@ -83,6 +83,7 @@
 
   var NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
   var BLACK = { 1: true, 3: true, 6: true, 8: true, 10: true };
+  var PAD_BASE = 60; // MIDI note at which a pitched pad plays its original (unshifted) sound
 
   /* ---------------- State ---------------- */
   var state = {
@@ -173,7 +174,9 @@
       name: inst.name + " " + (sameKind + 1),
       muted: false,
       vol: 1, // per-track volume 0..1
-      events: [] // drums: {pos, pad}; keys: {pos, midi, dur}
+      pitched: false, // pad kits: play the active pad chromatically on a keyboard
+      activePad: inst.kind === "pads" ? inst.pads[0].id : null,
+      events: [] // drums: {pos, pad[, midi]}; keys: {pos, midi, dur}
     };
   }
   function getTrack(id) {
@@ -263,8 +266,9 @@
   function triggerEvent(track, inst, ev, when, flash) {
     var tv = trackVol(track);
     if (inst.kind === "pads") {
-      Synth.playDrum(ctx, master, ev.pad, when, 0.9 * tv);
-      if (flash) queueFlash(when, padFlasher(ev.pad));
+      var semi = ev.midi != null ? ev.midi - PAD_BASE : 0;
+      Synth.playDrum(ctx, master, ev.pad, when, 0.9 * tv, semi);
+      if (flash) queueFlash(when, ev.midi != null ? keyFlasher(ev.midi) : padFlasher(ev.pad));
     } else {
       var durSec = (ev.dur || 0.25) * secPerBeat();
       var v = Synth.makeVoice(ctx, master, inst.voice, ev.midi, when, 0.85 * tv);
@@ -294,6 +298,18 @@
     Synth.playDrum(ctx, master, padId, ctx.currentTime, 0.95 * trackVol(track));
     if (recording && playing && track.id === state.selectedId) {
       track.events.push({ pos: quantizePos(loopPosBeats()), pad: padId });
+      drawTrackHits(track);
+      save();
+    }
+  }
+
+  // Play the track's active pad sound pitched to `midi` (for pad kits in note mode).
+  function livePadNote(track, midi) {
+    resumeAudio();
+    var pad = track.activePad || INSTRUMENTS[track.instrument].pads[0].id;
+    Synth.playDrum(ctx, master, pad, ctx.currentTime, 0.95 * trackVol(track), midi - PAD_BASE);
+    if (recording && playing && track.id === state.selectedId) {
+      track.events.push({ pos: quantizePos(loopPosBeats()), pad: pad, midi: midi });
       drawTrackHits(track);
       save();
     }
@@ -509,8 +525,57 @@
     var inst = INSTRUMENTS[track.instrument];
     nameEl.textContent = "Playing: " + track.name;
     nameEl.style.color = inst.color;
-    if (inst.kind === "pads") body.appendChild(buildPads(track, inst));
+    if (inst.kind === "pads") body.appendChild(buildPadStage(track, inst));
     else body.appendChild(buildKeyboard(track, inst));
+  }
+
+  // Pad kits get a "Pads / Notes" toggle: Pads = tap one-shots (drum style);
+  // Notes = pick a sound and play it pitched across a keyboard (sampler style).
+  function buildPadStage(track, inst) {
+    var wrap = document.createElement("div");
+    wrap.className = "pad-stage";
+
+    var toggle = document.createElement("div");
+    toggle.className = "pad-mode";
+    [["pads", "Pads"], ["notes", "Notes"]].forEach(function (m) {
+      var b = document.createElement("button");
+      var isNotes = m[0] === "notes";
+      b.className = "pad-mode-btn" + (isNotes === !!track.pitched ? " on" : "");
+      b.textContent = m[1];
+      b.addEventListener("click", function () {
+        if (!!track.pitched === isNotes) return;
+        track.pitched = isNotes;
+        renderStage(); save();
+      });
+      toggle.appendChild(b);
+    });
+    wrap.appendChild(toggle);
+
+    if (!track.pitched) {
+      wrap.appendChild(buildPads(track, inst));
+      return wrap;
+    }
+
+    // Notes mode: choose which pad sound the keyboard plays, then a keyboard.
+    if (!track.activePad) track.activePad = inst.pads[0].id;
+    var pick = document.createElement("div");
+    pick.className = "pad-pick";
+    pick.style.setProperty("--lane-color", inst.color);
+    inst.pads.forEach(function (p) {
+      var chip = document.createElement("button");
+      chip.className = "pad-chip" + (track.activePad === p.id ? " on" : "");
+      chip.textContent = p.label;
+      chip.addEventListener("click", function () {
+        track.activePad = p.id;
+        resumeAudio();
+        Synth.playDrum(ctx, master, p.id, ctx.currentTime, 0.9 * trackVol(track), 0); // preview
+        renderStage(); save();
+      });
+      pick.appendChild(chip);
+    });
+    wrap.appendChild(pick);
+    wrap.appendChild(buildKeyboard(track, inst));
+    return wrap;
   }
 
   function buildPads(track, inst) {
@@ -543,8 +608,9 @@
     kb.className = "keyboard";
     kb.style.setProperty("--lane-color", inst.color);
 
-    var base = inst.baseMidi;
-    var count = inst.octaves * 12 + 1;
+    // Pad kits have no baseMidi/octaves — center the playable range on PAD_BASE.
+    var base = inst.baseMidi != null ? inst.baseMidi : PAD_BASE - 12;
+    var count = (inst.octaves || 2) * 12 + 1;
     // first pass: white keys
     var whiteIndex = 0;
     var whiteW = 46, whiteGap = 2;
@@ -581,14 +647,27 @@
     var key = document.createElement("div");
     key.className = cls;
     key.dataset.midi = midi;
-    key.addEventListener("pointerdown", function (e) {
-      e.preventDefault();
-      try { key.setPointerCapture(e.pointerId); } catch (x) {}
-      liveNoteOn(e.pointerId, track, midi, key);
-    });
-    var off = function (e) { liveNoteOff(e.pointerId); };
-    key.addEventListener("pointerup", off);
-    key.addEventListener("pointercancel", off);
+    if (inst.kind === "pads") {
+      // Pad sounds are one-shots — no sustain/note-off bookkeeping.
+      key.addEventListener("pointerdown", function (e) {
+        e.preventDefault();
+        key.classList.add("active");
+        livePadNote(track, midi);
+      });
+      var clr = function () { key.classList.remove("active"); };
+      key.addEventListener("pointerup", clr);
+      key.addEventListener("pointerleave", clr);
+      key.addEventListener("pointercancel", clr);
+    } else {
+      key.addEventListener("pointerdown", function (e) {
+        e.preventDefault();
+        try { key.setPointerCapture(e.pointerId); } catch (x) {}
+        liveNoteOn(e.pointerId, track, midi, key);
+      });
+      var off = function (e) { liveNoteOff(e.pointerId); };
+      key.addEventListener("pointerup", off);
+      key.addEventListener("pointercancel", off);
+    }
     return key;
   }
 
@@ -694,7 +773,7 @@
           if (ev.pos >= tb) return;
           var when = rOff + ev.pos * spb;
           if (inst.kind === "pads") {
-            Synth.playDrum(off, m, ev.pad, when, 0.9 * tv);
+            Synth.playDrum(off, m, ev.pad, when, 0.9 * tv, ev.midi != null ? ev.midi - PAD_BASE : 0);
           } else {
             var v = Synth.makeVoice(off, m, inst.voice, ev.midi, when, 0.85 * tv);
             v.stop(when + (ev.dur || 0.25) * spb);
@@ -860,7 +939,14 @@
         state.fx.delay = data.fx.delay || 0;
       }
       state.tracks = data.tracks;
-      state.tracks.forEach(function (t, i) { t.id = "t" + (i + 1); t.events = t.events || []; if (t.vol == null) t.vol = 1; });
+      state.tracks.forEach(function (t, i) {
+        t.id = "t" + (i + 1);
+        t.events = t.events || [];
+        if (t.vol == null) t.vol = 1;
+        if (t.pitched == null) t.pitched = false;
+        var pi = INSTRUMENTS[t.instrument];
+        if (!t.activePad && pi && pi.kind === "pads") t.activePad = pi.pads[0].id;
+      });
       state.seq = state.tracks.length + 1;
       state.selectedId = state.tracks[0] ? state.tracks[0].id : null;
       history.replaceState(null, "", location.pathname);

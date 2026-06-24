@@ -20,6 +20,10 @@ the Web Audio API.
 3. Tap **REC**, then play the pads/keys at the bottom. Whatever you tap gets
    recorded into the loop, snapped to the beat (set **Quantize** to *Off* for a
    looser, human feel).
+   - Drum/Foley kits have a **Pads / Notes** toggle. *Pads* plays one-shots
+     (drum style); *Notes* lets you pick one sound (e.g. **Pop** or **Click**)
+     and play it **pitched across a full keyboard** — turning any percussion hit
+     into a chromatic, melodic voice.
 4. Hit **▶** to play. Add more tracks and **overdub** — the existing loop keeps
    playing while you record the new one.
 5. Tap **On/Off** on any track to mute it live. **Clear** wipes a track's notes;

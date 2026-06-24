@@ -36,15 +36,18 @@
     return buf;
   }
 
-  /* ---- Drums ---- */
-  function playDrum(ctx, dest, pad, when, vel) {
+  /* ---- Drums / percussion ----
+     `semi` transposes the whole sound by that many semitones (0 = original),
+     so a pad can be played chromatically across a keyboard. */
+  function playDrum(ctx, dest, pad, when, vel, semi) {
     vel = vel == null ? 0.9 : vel;
+    const R = Math.pow(2, (semi || 0) / 12); // pitch ratio
     switch (pad) {
       case "kick": {
         const o = ctx.createOscillator();
         const g = ctx.createGain();
-        o.frequency.setValueAtTime(150, when);
-        o.frequency.exponentialRampToValueAtTime(45, when + 0.12);
+        o.frequency.setValueAtTime(150 * R, when);
+        o.frequency.exponentialRampToValueAtTime(45 * R, when + 0.12);
         g.gain.setValueAtTime(vel, when);
         g.gain.exponentialRampToValueAtTime(0.001, when + 0.35);
         o.connect(g).connect(dest);
@@ -58,7 +61,7 @@
         src.buffer = getNoise(ctx);
         const bp = ctx.createBiquadFilter();
         bp.type = "bandpass";
-        bp.frequency.value = 1800;
+        bp.frequency.value = 1800 * R;
         const ng = ctx.createGain();
         ng.gain.setValueAtTime(vel * 0.8, when);
         ng.gain.exponentialRampToValueAtTime(0.001, when + 0.2);
@@ -68,7 +71,7 @@
         // tone snap
         const o = ctx.createOscillator();
         o.type = "triangle";
-        o.frequency.value = 180;
+        o.frequency.value = 180 * R;
         const og = ctx.createGain();
         og.gain.setValueAtTime(vel * 0.5, when);
         og.gain.exponentialRampToValueAtTime(0.001, when + 0.12);
@@ -83,7 +86,7 @@
         src.buffer = getNoise(ctx);
         const hp = ctx.createBiquadFilter();
         hp.type = "highpass";
-        hp.frequency.value = 7000;
+        hp.frequency.value = 7000 * R;
         const g = ctx.createGain();
         const dur = pad === "openhat" ? 0.3 : 0.05;
         g.gain.setValueAtTime(vel * 0.5, when);
@@ -98,7 +101,7 @@
         g.connect(dest);
         const bp = ctx.createBiquadFilter();
         bp.type = "bandpass";
-        bp.frequency.value = 1000;
+        bp.frequency.value = 1000 * R;
         bp.Q.value = 1.2;
         bp.connect(g);
         const offsets = [0, 0.012, 0.024, 0.05];
@@ -119,8 +122,8 @@
       case "tom": {
         const o = ctx.createOscillator();
         const g = ctx.createGain();
-        o.frequency.setValueAtTime(180, when);
-        o.frequency.exponentialRampToValueAtTime(80, when + 0.2);
+        o.frequency.setValueAtTime(180 * R, when);
+        o.frequency.exponentialRampToValueAtTime(80 * R, when + 0.2);
         g.gain.setValueAtTime(vel * 0.9, when);
         g.gain.exponentialRampToValueAtTime(0.001, when + 0.3);
         o.connect(g).connect(dest);
@@ -135,9 +138,9 @@
         const bp = ctx.createBiquadFilter();
         bp.type = "bandpass";
         bp.Q.value = 0.8;
-        bp.frequency.setValueAtTime(800, when);
-        bp.frequency.exponentialRampToValueAtTime(5000, when + 0.18);
-        bp.frequency.exponentialRampToValueAtTime(1200, when + 0.4);
+        bp.frequency.setValueAtTime(800 * R, when);
+        bp.frequency.exponentialRampToValueAtTime(5000 * R, when + 0.18);
+        bp.frequency.exponentialRampToValueAtTime(1200 * R, when + 0.4);
         const g = ctx.createGain();
         g.gain.setValueAtTime(0.0001, when);
         g.gain.linearRampToValueAtTime(vel * 0.5, when + 0.06);
@@ -151,9 +154,9 @@
         // water drop: resonant sine diving down then a tiny upturn ("ploink")
         const o = ctx.createOscillator();
         o.type = "sine";
-        o.frequency.setValueAtTime(1800, when);
-        o.frequency.exponentialRampToValueAtTime(700, when + 0.05);
-        o.frequency.exponentialRampToValueAtTime(1400, when + 0.09);
+        o.frequency.setValueAtTime(1800 * R, when);
+        o.frequency.exponentialRampToValueAtTime(700 * R, when + 0.05);
+        o.frequency.exponentialRampToValueAtTime(1400 * R, when + 0.09);
         const g = ctx.createGain();
         g.gain.setValueAtTime(vel * 0.7, when);
         g.gain.exponentialRampToValueAtTime(0.0001, when + 0.18);
@@ -166,8 +169,8 @@
         // bubble pop: very short blip rising in pitch
         const o = ctx.createOscillator();
         o.type = "sine";
-        o.frequency.setValueAtTime(400, when);
-        o.frequency.exponentialRampToValueAtTime(900, when + 0.03);
+        o.frequency.setValueAtTime(400 * R, when);
+        o.frequency.exponentialRampToValueAtTime(900 * R, when + 0.03);
         const g = ctx.createGain();
         g.gain.setValueAtTime(vel * 0.6, when);
         g.gain.exponentialRampToValueAtTime(0.0001, when + 0.06);
@@ -180,7 +183,7 @@
         // dry tick
         const o = ctx.createOscillator();
         o.type = "square";
-        o.frequency.value = 2200;
+        o.frequency.value = 2200 * R;
         const g = ctx.createGain();
         g.gain.setValueAtTime(vel * 0.5, when);
         g.gain.exponentialRampToValueAtTime(0.0001, when + 0.02);
@@ -195,7 +198,7 @@
         src.buffer = getNoise(ctx);
         const bp = ctx.createBiquadFilter();
         bp.type = "bandpass";
-        bp.frequency.value = 2600;
+        bp.frequency.value = 2600 * R;
         bp.Q.value = 3;
         const g = ctx.createGain();
         g.gain.setValueAtTime(vel * 0.9, when);
@@ -209,14 +212,14 @@
         // dog "woof": pitch-dropping saw through a vocal bandpass, "wu-uff" envelope + noise grit
         const o = ctx.createOscillator();
         o.type = "sawtooth";
-        o.frequency.setValueAtTime(420, when);
-        o.frequency.exponentialRampToValueAtTime(180, when + 0.07);
-        o.frequency.exponentialRampToValueAtTime(120, when + 0.18);
+        o.frequency.setValueAtTime(420 * R, when);
+        o.frequency.exponentialRampToValueAtTime(180 * R, when + 0.07);
+        o.frequency.exponentialRampToValueAtTime(120 * R, when + 0.18);
         const bp = ctx.createBiquadFilter();
         bp.type = "bandpass";
-        bp.frequency.setValueAtTime(900, when);
-        bp.frequency.exponentialRampToValueAtTime(1600, when + 0.05);
-        bp.frequency.exponentialRampToValueAtTime(700, when + 0.18);
+        bp.frequency.setValueAtTime(900 * R, when);
+        bp.frequency.exponentialRampToValueAtTime(1600 * R, when + 0.05);
+        bp.frequency.exponentialRampToValueAtTime(700 * R, when + 0.18);
         bp.Q.value = 4;
         const g = ctx.createGain();
         g.gain.setValueAtTime(0.0001, when);
@@ -231,7 +234,7 @@
         src.buffer = getNoise(ctx);
         const hp = ctx.createBiquadFilter();
         hp.type = "highpass";
-        hp.frequency.value = 1200;
+        hp.frequency.value = 1200 * R;
         const ng = ctx.createGain();
         ng.gain.setValueAtTime(vel * 0.15, when);
         ng.gain.exponentialRampToValueAtTime(0.0001, when + 0.12);
