@@ -13,7 +13,7 @@ the Web Audio API.
    - On a phone, serve it (see below) and "Add to Home Screen" to run it full-screen.
 2. **+ Add track** → pick an instrument from the grouped picker:
    - **Drums & FX** – Drums (kick/snare/hats/clap/tom) and a **Foley FX** kit
-     (broom sweep, water drop, pop, click, snap, dog bark).
+     (broom sweep, water drop, pop, click, snap, BYO).
    - **Keys & strings** – Piano, Acoustic Guitar, Electric Guitar, Bass.
    - **Synth & lead** – Synth, Whistle.
    - **Brass** – Trumpet, Trombone, French Horn.
@@ -23,14 +23,16 @@ the Web Audio API.
 4. Hit **▶** to play. Add more tracks and **overdub** — the existing loop keeps
    playing while you record the new one.
 5. Tap **On/Off** on any track to mute it live. **Clear** wipes a track's notes;
-   **✕** deletes it.
+   **✕** deletes it. Tap a track lane to select it (its instrument shows on the
+   performance pad); tap it again to deselect.
 
 ### Controls
 - **BPM** – tempo (40–240).
 - **Loop** – loop length in bars (1/2/4/8).
 - **Quantize** – snap recorded hits to a grid (1/4, 1/8, 1/16) or *Off*.
-- **🅼** – metronome click.
-- **Vol** – master volume.
+- **🅼** – metronome click (a practice-only click; never recorded or exported).
+- **Vol** – contextual volume: with a track selected it sets **that track's**
+  level (and shows the track name); with nothing selected it's **master** volume.
 - **Reverb** / **Delay** – master effects (the delay is tempo-synced). They're
   baked into rendered audio and travel with a shared arrangement link.
 - Desktop: **Spacebar** = play/stop.

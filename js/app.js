@@ -21,14 +21,14 @@
     },
     foley: {
       name: "Foley FX", kind: "pads", color: "#7ad7a0", category: "Drums & FX",
-      desc: "Brooms, drops, snaps & barks",
+      desc: "Brooms, drops, snaps & more",
       pads: [
         { id: "broom", label: "Broom" },
         { id: "drop", label: "Water Drop" },
         { id: "pop", label: "Pop" },
         { id: "click", label: "Click" },
         { id: "snap", label: "Snap" },
-        { id: "bark", label: "Dog Bark" }
+        { id: "bark", label: "BYO" }
       ]
     },
     piano: {
@@ -172,6 +172,7 @@
       instrument: instKey,
       name: inst.name + " " + (sameKind + 1),
       muted: false,
+      vol: 1, // per-track volume 0..1
       events: [] // drums: {pos, pad}; keys: {pos, midi, dur}
     };
   }
@@ -179,6 +180,8 @@
     for (var i = 0; i < state.tracks.length; i++) if (state.tracks[i].id === id) return state.tracks[i];
     return null;
   }
+  // Per-track volume, defaulting to full for tracks saved before this existed.
+  function trackVol(track) { return track && track.vol != null ? track.vol : 1; }
   function selectedTrack() { return getTrack(state.selectedId); }
 
   /* ---------------- Transport / scheduler ---------------- */
@@ -258,12 +261,13 @@
   }
 
   function triggerEvent(track, inst, ev, when, flash) {
+    var tv = trackVol(track);
     if (inst.kind === "pads") {
-      Synth.playDrum(ctx, master, ev.pad, when, 0.9);
+      Synth.playDrum(ctx, master, ev.pad, when, 0.9 * tv);
       if (flash) queueFlash(when, padFlasher(ev.pad));
     } else {
       var durSec = (ev.dur || 0.25) * secPerBeat();
-      var v = Synth.makeVoice(ctx, master, inst.voice, ev.midi, when, 0.85);
+      var v = Synth.makeVoice(ctx, master, inst.voice, ev.midi, when, 0.85 * tv);
       v.stop(when + durSec);
       if (flash) queueFlash(when, keyFlasher(ev.midi));
     }
@@ -287,7 +291,7 @@
 
   function liveDrum(track, padId) {
     resumeAudio();
-    Synth.playDrum(ctx, master, padId, ctx.currentTime, 0.95);
+    Synth.playDrum(ctx, master, padId, ctx.currentTime, 0.95 * trackVol(track));
     if (recording && playing && track.id === state.selectedId) {
       track.events.push({ pos: quantizePos(loopPosBeats()), pad: padId });
       drawTrackHits(track);
@@ -298,7 +302,7 @@
   function liveNoteOn(pointerId, track, midi, el) {
     resumeAudio();
     var inst = INSTRUMENTS[track.instrument];
-    var voice = Synth.makeVoice(ctx, master, inst.voice, midi, ctx.currentTime, 0.9);
+    var voice = Synth.makeVoice(ctx, master, inst.voice, midi, ctx.currentTime, 0.9 * trackVol(track));
     liveVoices[pointerId] = {
       voice: voice, trackId: track.id, midi: midi,
       startBeat: playing ? loopPosBeats() : 0, el: el
@@ -428,7 +432,10 @@
 
       lane.appendChild(top);
       lane.appendChild(tl);
-      lane.addEventListener("click", function () { selectTrack(track.id); });
+      lane.addEventListener("click", function () {
+        // Re-tapping the selected track deselects it (Vol returns to master).
+        selectTrack(track.id === state.selectedId ? null : track.id);
+      });
       list.appendChild(lane);
 
       drawTrackHits(track);
@@ -468,8 +475,28 @@
     save();
   }
 
+  // The single Vol slider is contextual: it controls the selected track's
+  // volume, or master volume when no track is selected.
+  function updateVolUI() {
+    var slider = document.getElementById("masterVol");
+    var label = document.getElementById("volLabel");
+    var t = selectedTrack();
+    if (t) {
+      slider.value = String(trackVol(t));
+      slider.style.accentColor = INSTRUMENTS[t.instrument].color;
+      label.textContent = t.name;
+      label.style.color = INSTRUMENTS[t.instrument].color;
+    } else {
+      slider.value = String(state.masterVol);
+      slider.style.accentColor = "";
+      label.textContent = "Master";
+      label.style.color = "";
+    }
+  }
+
   /* ---------------- Rendering: stage (performance pad) ---------------- */
   function renderStage() {
+    updateVolUI();
     var track = selectedTrack();
     var nameEl = document.getElementById("stageTrackName");
     var body = document.getElementById("stageBody");
@@ -628,7 +655,6 @@
     document.getElementById("bpmValue").textContent = state.bpm;
     document.getElementById("barsSelect").value = String(state.bars);
     document.getElementById("quantizeSelect").value = String(state.quantize);
-    document.getElementById("masterVol").value = String(state.masterVol);
     document.getElementById("reverbAmt").value = String(state.fx.reverb);
     document.getElementById("delayAmt").value = String(state.fx.delay);
     document.getElementById("metroBtn").setAttribute("aria-pressed", state.metronome ? "true" : "false");
@@ -663,13 +689,14 @@
       state.tracks.forEach(function (track) {
         if (track.muted) return;
         var inst = INSTRUMENTS[track.instrument];
+        var tv = trackVol(track);
         track.events.forEach(function (ev) {
           if (ev.pos >= tb) return;
           var when = rOff + ev.pos * spb;
           if (inst.kind === "pads") {
-            Synth.playDrum(off, m, ev.pad, when, 0.9);
+            Synth.playDrum(off, m, ev.pad, when, 0.9 * tv);
           } else {
-            var v = Synth.makeVoice(off, m, inst.voice, ev.midi, when, 0.85);
+            var v = Synth.makeVoice(off, m, inst.voice, ev.midi, when, 0.85 * tv);
             v.stop(when + (ev.dur || 0.25) * spb);
           }
         });
@@ -833,7 +860,7 @@
         state.fx.delay = data.fx.delay || 0;
       }
       state.tracks = data.tracks;
-      state.tracks.forEach(function (t, i) { t.id = "t" + (i + 1); t.events = t.events || []; });
+      state.tracks.forEach(function (t, i) { t.id = "t" + (i + 1); t.events = t.events || []; if (t.vol == null) t.vol = 1; });
       state.seq = state.tracks.length + 1;
       state.selectedId = state.tracks[0] ? state.tracks[0].id : null;
       history.replaceState(null, "", location.pathname);
@@ -899,8 +926,14 @@
       save();
     });
     document.getElementById("masterVol").addEventListener("input", function (e) {
-      state.masterVol = parseFloat(e.target.value);
-      if (master) master.gain.value = state.masterVol;
+      var val = parseFloat(e.target.value);
+      var t = selectedTrack();
+      if (t) {
+        t.vol = val;
+      } else {
+        state.masterVol = val;
+        if (master) master.gain.value = val;
+      }
       save();
     });
     document.getElementById("reverbAmt").addEventListener("input", function (e) {
