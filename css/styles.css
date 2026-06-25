@@ -25,9 +25,16 @@ html, body {
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   overscroll-behavior: none;
+  /* Kill iOS Safari's double-tap-to-zoom (and the legacy 300ms tap delay) so
+     fast tapping on pads/keys/buttons never zooms. Scroll + pinch-zoom remain;
+     pads/keyboard further restrict this to touch-action:none below. */
+  touch-action: manipulation;
 }
 
 button, select, input { font-family: inherit; }
+/* Belt-and-suspenders for the double-tap-zoom fix: apply directly to the
+   tappable controls too (some iOS versions don't honor it from an ancestor). */
+button, select, input, label, .lane { touch-action: manipulation; }
 
 #app {
   display: flex;
